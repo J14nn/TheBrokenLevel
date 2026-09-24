@@ -32,9 +32,6 @@ func _on_body_entered(body: Node2D) -> void:
 func _on_body_exited(body: Node2D) -> void:
 	if body.name == "Spieler":
 		if offen:
-			if Global.SearcherRunning:
-				Global.CommandWordSearcher("close")
-				Global.SearcherRunning = false
 			$Hint.visible = false
 			$TruheSprite.play("close")
 			$Hint/HelpButton/Timer.wait_time = 2.0
@@ -49,10 +46,6 @@ func _on_help_button_pressed() -> void:
 	$Hint/HelpButton/Timer.wait_time = 10.0
 	$Hint/HelpButton/Timer.start()
 	help_clicked = true
-
-	if !Global.SearcherRunning:
-		Global.StartWordSearcher(WordsToFind)		
-	Global.CommandWordSearcher("search")
 
 func _on_timer_timeout() -> void:
 	if !help_clicked && $Hint.visible:
