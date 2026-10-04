@@ -3,9 +3,12 @@ extends CharacterBody2D
 @export var geschwindigkeit: float = 150.0
 @export var gravitation: float = 400.0
 @export var fall_multiplier: float = 2.5
+@export var klettern_geschwindigkeit: float = 100.0
+@export var klettern_seitlich: float = 50.0
+@export var klettern_beschleunigung: float = 800.0
 
-var default_gravitation: float
-var default_speed: float
+
+var klettern_sperre: float = 0.0
 
 var angriffs_index: int = 0
 var gestorben: bool = false
@@ -29,8 +32,6 @@ func _ready() -> void:
 	$SpielerSprite.animation_finished.connect(_animation_fertig)
 
 	spawn = position
-	default_gravitation = gravitation
-	default_speed = geschwindigkeit
 
 
 func Spring() -> void:
@@ -65,9 +66,26 @@ func _physics_process(delta: float) -> void:
 		return
 
 	if Global.tot:
+		Global.klettert = false
 		velocity.y = 100.0
 		velocity.x = 0.0
 		move_and_slide()
+		return
+
+	klettern_sperre = max(klettern_sperre - delta, 0.0)
+	var vertikal_input: float = Input.get_axis("move_up", "move_down")
+
+	if Global.klettert:
+		if Global.leitern == 0 or (is_on_floor() and vertikal_input > 0.0):
+			Global.klettert = false
+	elif Global.leitern > 0 and klettern_sperre <= 0.0 and not Global.angreift:
+		if vertikal_input < 0.0 or (vertikal_input > 0.0 and not is_on_floor()):
+			Global.klettert = true
+			Global.springt = false
+			velocity = Vector2.ZERO
+
+	if Global.klettert:
+		klettern(delta, vertikal_input)
 		return
 
 	# Coyote Time
@@ -75,24 +93,6 @@ func _physics_process(delta: float) -> void:
 		coyote_time_left = coyote_time
 	else:
 		coyote_time_left = max(coyote_time_left - delta, 0.0)
-
-	# Klettern
-	if Global.klettert:
-		if Input.is_action_pressed("move_up"):
-			gravitation = 0.0
-			geschwindigkeit = 50.0
-			velocity.y = -100.0
-			$SpielerSprite.play("klettern_seite")
-
-		elif Input.is_action_pressed("move_down"):
-			gravitation = 0.0
-			geschwindigkeit = 50.0
-			velocity.y = 100.0
-			$SpielerSprite.play("klettern_seite")
-
-	else:
-		gravitation = default_gravitation
-		geschwindigkeit = default_speed
 
 	# Gravitation
 	if velocity.y > 0.0:
@@ -115,7 +115,7 @@ func _physics_process(delta: float) -> void:
 		horizontal_bewegung()
 
 	# Animation
-	if not Global.angreift and not Global.klettert:
+	if not Global.angreift:
 		spieler_animation()
 
 	# Apply movement
@@ -148,10 +148,35 @@ func _input(event: InputEvent) -> void:
 
 		angriffs_index = 1 - angriffs_index
 
-	# Jump
-	if event.is_action_pressed("jump") and coyote_time_left > 0.0:
+	# Jump (also allowed from a ladder)
+	if event.is_action_pressed("jump") and (coyote_time_left > 0.0 or Global.klettert):
+		if Global.klettert:
+			Global.klettert = false
+			klettern_sperre = 0.3
 		Spring()
 		coyote_time_left = 0.0
+
+
+func klettern(delta: float, vertikal_input: float) -> void:
+	var horizontal_input: float = Input.get_axis("move_left", "move_right")
+	var ziel := Vector2(
+		horizontal_input * klettern_seitlich,
+		vertikal_input * klettern_geschwindigkeit
+	)
+	velocity = velocity.move_toward(ziel, klettern_beschleunigung * delta)
+
+	# Lets the player still jump right after climbing off the top
+	coyote_time_left = coyote_time
+
+	if horizontal_input != 0.0:
+		$SpielerSprite.flip_h = horizontal_input < 0.0
+
+	if ziel != Vector2.ZERO:
+		$SpielerSprite.play("klettern_seite")
+	else:
+		$SpielerSprite.pause()
+
+	move_and_slide()
 
 
 func horizontal_bewegung() -> void:
@@ -197,9 +222,6 @@ func _animation_fertig() -> void:
 	if anim == "angreifen_1" or anim == "angreifen_2":
 		Global.angreift = false
 		gegner_bereits_getroffen.clear()
-
-	if anim == "klettern_hinten" or anim == "klettern_seite":
-		Global.klettert = false
 
 
 func _on_angriff_kollision_body_entered(body: Node2D) -> void:

@@ -1,6 +1,7 @@
 extends Node
 
 var klettert: bool = false
+var leitern: int = 0
 var springt: bool = false
 var angreift: bool = false
 var gegner_getroffen: Array[Node2D] = []

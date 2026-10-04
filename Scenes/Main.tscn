@@ -779,7 +779,6 @@ metadata/_edit_lock_ = true
 [node name="Spieler" parent="." instance=ExtResource("2_uu6xs")]
 position = Vector2(77, 622)
 metadata/locked_permanently = true
-metadata/_edit_lock_ = true
 
 [node name="Camera2D" type="Camera2D" parent="Spieler"]
 position = Vector2(14, -63)
