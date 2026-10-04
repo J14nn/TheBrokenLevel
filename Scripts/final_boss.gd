@@ -6,7 +6,7 @@ extends CharacterBody2D
 @export var fall_multiplier: float = 2.5
 
 var ChargeSpeed: float = 2
-var ChargeDuration: float = 1.3
+@export var ChargeDuration: float = 2.2
 var Treffer: int = 0
 var angriff: bool = false
 var laufen: bool = true
@@ -70,32 +70,32 @@ func _physics_process(delta: float) -> void:
 
 	var richtung = Vector2.RIGHT if flip else Vector2.LEFT
 
-	if $EdgeCheck:
-		if charging:
-			can_move_forward = true
-		else:
-			can_move_forward = $EdgeCheck.is_colliding()
+	can_move_forward = true
+	if $EdgeCheck and is_on_floor() and not charging:
+		$EdgeCheck.force_raycast_update()
+		can_move_forward = $EdgeCheck.is_colliding()
+	if not charging and is_on_wall() and get_wall_normal().x * richtung.x < 0:
+		can_move_forward = false
 
 	if player_in_range and not charging and not kriegt_schaden and can_move_forward:
 		charging = true
 		charge_timer = ChargeDuration
 		laufen = false
 
-	if charging and can_move_forward:
+	if charging:
 		velocity.x = richtung.x * ChargeSpeed * Geschwindigkeit
 		charge_timer -= delta
 		if charge_timer <= 0:
 			charging = false
 			laufen = true
 			velocity.x = 0
-	else:
-		if laufen or charging:
-			if can_move_forward:
-				velocity.x = richtung.x * Geschwindigkeit
-			else:
-				velocity.x = 0
-				flip = !flip
-				_flip()
+	elif not can_move_forward:
+		velocity.x = 0
+		if not player_in_range:
+			flip = !flip
+			_flip()
+	elif laufen:
+		velocity.x = richtung.x * Geschwindigkeit
 
 	move_and_slide()
 	_update_animation()
@@ -104,7 +104,8 @@ func _flip():
 	$BossSprite.flip_h = flip
 	
 	if $EdgeCheck:
-		$EdgeCheck.position.x = 72 if flip else -60
+
+		$EdgeCheck.position.x = 11 if flip else -10
 		$EdgeCheck.target_position = Vector2(0, 16)
 	
 	if $DamageArea:
@@ -119,7 +120,7 @@ func _update_animation():
 		return
 	elif charging:
 		$BossSprite.play("angreifen")
-	elif laufen:
+	elif laufen and can_move_forward:
 		$BossSprite.play("laufen")
 	else:
 		$BossSprite.play("stehen")
@@ -132,7 +133,7 @@ func _animation_fertig():
 		kriegt_schaden = false
 
 func _on_area_2d_body_entered(body: Node2D) -> void:
-	if body.name == "Spieler" and Treffer < 3 and can_move_forward:
+	if body.name == "Spieler" and Treffer < 3:
 		player_in_range = true
 		player_ref = body		
 
@@ -140,11 +141,6 @@ func _on_area_2d_body_exited(body: Node2D) -> void:
 	if body.name == "Spieler":
 		player_in_range = false
 		player_ref = null
-
-func _on_timer_timeout() -> void:
-	if !player_in_range and !charging and !kriegt_schaden and !tot:
-		flip = !flip
-		_flip() 
 
 func _on_damage_area_area_entered(_area: Area2D) -> void:
 	if charging and MachtSchaden and not Global.tot:

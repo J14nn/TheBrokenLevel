@@ -676,10 +676,10 @@ position = Vector2(15, 234)
 position = Vector2(62, 214)
 
 [node name="Kannone3" parent="Fallen" instance=ExtResource("4_5tuhn")]
-position = Vector2(302, -74)
+position = Vector2(95, -75)
 
 [node name="BossKiller" parent="Fallen" instance=ExtResource("10_fq0cl")]
-position = Vector2(620, -58)
+position = Vector2(127, -57)
 
 [node name="Leitern" type="Node2D" parent="."]
 position = Vector2(847, -190)
@@ -777,7 +777,7 @@ WordsToFind = "Spieler, Sprunghoehe:"
 metadata/_edit_lock_ = true
 
 [node name="Spieler" parent="." instance=ExtResource("2_uu6xs")]
-position = Vector2(353, 590)
+position = Vector2(1448, 584)
 metadata/locked_permanently = true
 
 [node name="Camera2D" type="Camera2D" parent="Spieler"]
