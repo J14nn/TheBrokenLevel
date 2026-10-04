@@ -777,7 +777,7 @@ WordsToFind = "Spieler, Sprunghoehe:"
 metadata/_edit_lock_ = true
 
 [node name="Spieler" parent="." instance=ExtResource("2_uu6xs")]
-position = Vector2(77, 622)
+position = Vector2(353, 590)
 metadata/locked_permanently = true
 
 [node name="Camera2D" type="Camera2D" parent="Spieler"]

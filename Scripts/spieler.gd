@@ -212,7 +212,7 @@ func spieler_animation() -> void:
 		if not Global.springt:
 			$SpielerSprite.play("rennen")
 
-	elif is_on_floor():
+	elif is_on_floor() and not Global.springt:
 		$SpielerSprite.play("stehen")
 
 
