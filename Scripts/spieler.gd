@@ -35,7 +35,7 @@ func _ready() -> void:
 
 
 func Spring() -> void:
-	var Sprunghoehe: float = 140.0
+	var Sprunghoehe: float = 160.0
 	Sprunghoehe = _update_internal_value(Sprunghoehe)
 
 	velocity.y = -Sprunghoehe
