@@ -1,14 +1,26 @@
 extends CharacterBody2D
 
 @export var geschwindigkeit: float = 150.0
-@export var gravitation: float = 400.0
-@export var fall_multiplier: float = 2.5
-@export var klettern_geschwindigkeit: float = 100.0
-@export var klettern_seitlich: float = 50.0
-@export var klettern_beschleunigung: float = 800.0
+var gravitation: float = 400.0
+var fall_multiplier: float = 2.5
+var klettern_geschwindigkeit: float = 100.0
+var klettern_seitlich: float = 50.0
+var klettern_beschleunigung: float = 800.0
 
+var boden_beschleunigung: float = 1800.0
+var boden_abbremsung: float = 2200.0
+var luft_beschleunigung: float = 900.0
+var luft_abbremsung: float = 900.0
+var luft_kontrolle: float = 0.5
+
+var sprung_puffer_zeit: float = 0.12
+
+var apex_schwelle: float = 60.0
+var apex_gravitations_skalierung: float = 0.55
 
 var klettern_sperre: float = 0.0
+var sprung_puffer_left: float = 0.0
+var war_am_boden: bool = false
 
 var angriffs_index: int = 0
 var gestorben: bool = false
@@ -41,7 +53,17 @@ func Spring() -> void:
 	velocity.y = -Sprunghoehe
 	Global.springt = true
 
+	_squash_and_stretch(0.8, 1.25)
+
 	$SpielerSprite.play("springen")
+
+
+func _squash_and_stretch(skalierung_x: float, skalierung_y: float, dauer: float = 0.15) -> void:
+	$SpielerSprite.scale = Vector2(skalierung_x, skalierung_y)
+
+	var tween := create_tween()
+	tween.tween_property($SpielerSprite, "scale", Vector2.ONE, dauer) \
+		.set_trans(Tween.TRANS_ELASTIC).set_ease(Tween.EASE_OUT)
 
 
 func _process(_delta: float) -> void:
@@ -73,6 +95,7 @@ func _physics_process(delta: float) -> void:
 		return
 
 	klettern_sperre = max(klettern_sperre - delta, 0.0)
+	sprung_puffer_left = max(sprung_puffer_left - delta, 0.0)
 	var vertikal_input: float = Input.get_axis("move_up", "move_down")
 
 	if Global.klettert:
@@ -84,6 +107,14 @@ func _physics_process(delta: float) -> void:
 			Global.springt = false
 			velocity = Vector2.ZERO
 
+	# Buffered jump off a ladder
+	if Global.klettert and sprung_puffer_left > 0.0:
+		Global.klettert = false
+		klettern_sperre = 0.3
+		Spring()
+		sprung_puffer_left = 0.0
+		coyote_time_left = 0.0
+
 	if Global.klettert:
 		klettern(delta, vertikal_input)
 		return
@@ -94,11 +125,21 @@ func _physics_process(delta: float) -> void:
 	else:
 		coyote_time_left = max(coyote_time_left - delta, 0.0)
 
-	# Gravitation
+	if sprung_puffer_left > 0.0 and coyote_time_left > 0.0:
+		Spring()
+		sprung_puffer_left = 0.0
+		coyote_time_left = 0.0
+
+	war_am_boden = is_on_floor()
+
+	var gravitation_aktuell: float = gravitation
+	if not is_on_floor() and abs(velocity.y) < apex_schwelle:
+		gravitation_aktuell *= apex_gravitations_skalierung
+
 	if velocity.y > 0.0:
-		velocity.y += gravitation * fall_multiplier * delta
+		velocity.y += gravitation_aktuell * fall_multiplier * delta
 	else:
-		velocity.y += gravitation * delta
+		velocity.y += gravitation_aktuell * delta
 
 	# Variable jump height
 	if velocity.y < 0.0 and not Input.is_action_pressed("jump"):
@@ -110,9 +151,9 @@ func _physics_process(delta: float) -> void:
 
 	# Horizontal movement
 	if Global.angreift:
-		velocity.x = 0.0
+		velocity.x = move_toward(velocity.x, 0.0, boden_abbremsung * delta)
 	else:
-		horizontal_bewegung()
+		horizontal_bewegung(delta)
 
 	# Animation
 	if not Global.angreift:
@@ -121,9 +162,12 @@ func _physics_process(delta: float) -> void:
 	# Apply movement
 	move_and_slide()
 
-	# Reset jump state after landing
-	if is_on_floor() and Global.springt:
-		Global.springt = false
+	if is_on_floor():
+		if Global.springt:
+			Global.springt = false
+
+		if not war_am_boden:
+			_squash_and_stretch(1.3, 0.7)
 
 
 func respawn() -> void:
@@ -147,14 +191,8 @@ func _input(event: InputEvent) -> void:
 			$SpielerSprite.play("angreifen_2")
 
 		angriffs_index = 1 - angriffs_index
-
-	# Jump (also allowed from a ladder)
-	if event.is_action_pressed("jump") and (coyote_time_left > 0.0 or Global.klettert):
-		if Global.klettert:
-			Global.klettert = false
-			klettern_sperre = 0.3
-		Spring()
-		coyote_time_left = 0.0
+	if event.is_action_pressed("jump"):
+		sprung_puffer_left = sprung_puffer_zeit
 
 
 func klettern(delta: float, vertikal_input: float) -> void:
@@ -179,7 +217,7 @@ func klettern(delta: float, vertikal_input: float) -> void:
 	move_and_slide()
 
 
-func horizontal_bewegung() -> void:
+func horizontal_bewegung(delta: float) -> void:
 	# -1.0 = left
 	#  0.0 = nothing
 	#  1.0 = right
@@ -188,11 +226,17 @@ func horizontal_bewegung() -> void:
 		"move_right"
 	)
 
+	var ziel_geschwindigkeit: float
+	var beschleunigung: float
+
 	if is_on_floor():
-		velocity.x = horizontal_input * geschwindigkeit
+		ziel_geschwindigkeit = horizontal_input * geschwindigkeit
+		beschleunigung = boden_beschleunigung if horizontal_input != 0.0 else boden_abbremsung
 	else:
-		var air_control_factor: float = 0.5
-		velocity.x = horizontal_input * geschwindigkeit * air_control_factor
+		ziel_geschwindigkeit = horizontal_input * geschwindigkeit * luft_kontrolle
+		beschleunigung = luft_beschleunigung if horizontal_input != 0.0 else luft_abbremsung
+
+	velocity.x = move_toward(velocity.x, ziel_geschwindigkeit, beschleunigung * delta)
 
 func spieler_animation() -> void:
 	var horizontal_input: float = Input.get_axis(
